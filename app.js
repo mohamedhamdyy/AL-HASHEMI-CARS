@@ -3,6 +3,16 @@
   var wa = (S.whatsapp || '').trim();
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
+  // ----- ستايل معرض الصور (مضاف من هنا، مش محتاج تعديل theme.css) -----
+  var st = document.createElement('style');
+  st.textContent =
+    '.photo{position:relative}' +
+    '.gal{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;width:100%;height:100%}' +
+    '.gal::-webkit-scrollbar{display:none}' +
+    '.gal img{flex:0 0 100%;width:100%;height:100%;object-fit:cover;scroll-snap-align:center;display:block}' +
+    '.gcount{position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,.6);color:#fff;font:600 12px/1 "IBM Plex Mono",monospace;padding:5px 8px;border-radius:999px;pointer-events:none}';
+  document.head.appendChild(st);
+
   // ----- بيانات الصفحة -----
   document.title = S.brand;
   $('plate').textContent = S.plate; $('brand').textContent = S.brand;
@@ -39,13 +49,26 @@
     if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w900';
     return v;
   }
+  // يجمع الصورة الرئيسية + عمود images (مصفوفة أو نص مفصول بفاصلة/سطر) بدون تكرار
+  function imgList(main, extra) {
+    var list = [];
+    if (main) list.push(main);
+    if (Array.isArray(extra)) list = list.concat(extra);
+    else if (typeof extra === 'string' && extra.trim()) list = list.concat(extra.replace(/^\{|\}$/g, '').split(/[\n,]+/));
+    var seen = {}, out = [];
+    list.forEach(function (u) {
+      u = imgUrl(String(u || '').replace(/^"|"$/g, '').trim());
+      if (u && !seen[u]) { seen[u] = 1; out.push(u); }
+    });
+    return out;
+  }
   function toCars(rows) {
     var out = [];
     for (var i = 1; i < rows.length; i++) {
       var r = rows[i]; if (!r || !(r[2] || '').trim()) continue;
       var show = (r[0] || '').trim().toLowerCase();
       if (['لا', 'no', 'n', 'مخفي', 'hide'].indexOf(show) > -1) continue;
-      out.push({ type: typeOf(r[1]), name: r[2].trim(), year: (r[3] || '').trim(), km: (r[4] || '').replace(/[^\d]/g, ''), price: (r[5] || '').trim(), note: (r[6] || '').trim(), status: statusOf(r[7]), image: imgUrl(r[8]) });
+      out.push({ type: typeOf(r[1]), name: r[2].trim(), year: (r[3] || '').trim(), km: (r[4] || '').replace(/[^\d]/g, ''), price: (r[5] || '').trim(), note: (r[6] || '').trim(), status: statusOf(r[7]), images: imgList(r[8], r[9]) });
     }
     return out;
   }
@@ -57,12 +80,19 @@
     for (var i = 0; i < 6; i++) { var ch = p[i]; if (ch !== '0') seen = true; h += '<i class="' + (seen ? '' : 'dim') + '">' + ch + '</i>'; }
     return '<div class="odo" dir="ltr" aria-label="' + esc(km) + ' كم">' + h + '<small>كم</small></div>';
   }
+  function gallery(c) {
+    var n = c.images.length;
+    if (!n) return '<div class="ph" aria-hidden="true">🚗</div>';
+    if (n === 1) return '<img src="' + esc(c.images[0]) + '" alt="' + esc(c.name) + '" loading="lazy" width="900" height="600" referrerpolicy="no-referrer">';
+    return '<div class="gal" dir="ltr">' + c.images.map(function (u, i) {
+      return '<img src="' + esc(u) + '" alt="' + esc(c.name) + ' ' + (i + 1) + '" loading="lazy" referrerpolicy="no-referrer">';
+    }).join('') + '</div><span class="gcount" dir="ltr">1/' + n + '</span>';
+  }
   function card(c) {
     var msg = 'السلام عليكم، مهتم بـ ' + c.name + (c.type === 'rent' ? ' (إيجار)' : ' (بيع)');
-    var photo = c.image ? '<img src="' + esc(c.image) + '" alt="' + esc(c.name) + '" loading="lazy" width="900" height="600" referrerpolicy="no-referrer">' : '<div class="ph" aria-hidden="true">🚗</div>';
     var sold = c.status === 'sold' ? '<span class="ribbon">' + (c.type === 'rent' ? 'مؤجرة' : 'تم البيع') + '</span>' : c.status === 'reserved' ? '<span class="ribbon amber">محجوزة</span>' : '';
     return '<article class="card status-' + c.status + '" data-type="' + c.type + '" data-name="' + esc((c.name + ' ' + c.year).toLowerCase()) + '">' +
-      '<div class="photo">' + photo + '<span class="tag ' + c.type + '">' + (c.type === 'rent' ? 'للإيجار' : 'للبيع') + '</span>' + sold + '</div>' +
+      '<div class="photo">' + gallery(c) + '<span class="tag ' + c.type + '">' + (c.type === 'rent' ? 'للإيجار' : 'للبيع') + '</span>' + sold + '</div>' +
       '<div class="body"><h3>' + esc(c.name) + '</h3><div class="meta">' +
       (c.year ? '<span>موديل ' + esc(c.year) + '</span>' : '') + (c.price ? '<span class="price">' + esc(c.price) + '</span>' : '') + '</div>' +
       odo(c.km) + (c.note ? '<p class="note">' + esc(c.note) + '</p>' : '') +
@@ -92,6 +122,14 @@
   chips.forEach(function (ch) { ch.addEventListener('click', function () { filter = ch.dataset.filter; chips.forEach(function (c) { c.classList.toggle('is-on', c === ch); }); apply(); }); });
   input.addEventListener('input', apply);
 
+  // عدّاد الصور (1/3) أثناء السحب
+  grid.addEventListener('scroll', function (e) {
+    var g = e.target;
+    if (!g.classList || !g.classList.contains('gal')) return;
+    var i = Math.round(Math.abs(g.scrollLeft) / g.clientWidth) + 1, cnt = g.parentNode.querySelector('.gcount');
+    if (cnt) cnt.textContent = i + '/' + g.children.length;
+  }, true);
+
   // ----- تحميل -----
   function load(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) { return toCars(parseCSV(t)); }); }
   function loadSupabase() {
@@ -102,7 +140,7 @@
       .then(function (r) { if (!r.ok) { return r.text().then(function (t) { throw new Error(r.status + ' ' + t); }); } return r.json(); })
       .then(function (rows) {
         return rows.map(function (r) {
-          return { type: r.type === 'rent' ? 'rent' : 'sale', name: r.name || '', year: r.year || '', km: r.km ? String(r.km) : '', price: r.price || '', note: r.note || '', status: ['sold', 'reserved'].indexOf(r.status) > -1 ? r.status : 'available', image: imgUrl(r.image) };
+          return { type: r.type === 'rent' ? 'rent' : 'sale', name: r.name || '', year: r.year || '', km: r.km ? String(r.km) : '', price: r.price || '', note: r.note || '', status: ['sold', 'reserved'].indexOf(r.status) > -1 ? r.status : 'available', images: imgList(r.image, r.images) };
         });
       });
   }
