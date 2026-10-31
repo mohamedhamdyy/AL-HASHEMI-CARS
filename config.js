@@ -2,7 +2,7 @@
 window.SITE = {
   // بيانات Supabase: Project Settings > API
   supabaseUrl: "https://ipzbaxvaeqqvuuuoqctk.supabase.co",
-  supabaseKey: "",   // الصق هنا مفتاح anon / publishable (مش service_role أبداً)
+  supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwemJheHZhZXFxdnV1dW9xY3RrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MzQwNDg3NywiZXhwIjoyMTA4OTgwODc3fQ.2xn5cRH3zcUht37NyYBjiDtUbxMexy5sdU_SbfQ2MHo",   // الصق هنا مفتاح anon / publishable (مش service_role أبداً)
 
   // رابط الشيت بعد ما تعمله "Publish to web" بصيغة CSV. سيبه فاضي وهيقرأ من ملف cars.csv
   sheetCsvUrl: "",
