@@ -96,14 +96,16 @@
   function load(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) { return toCars(parseCSV(t)); }); }
   function loadSupabase() {
     var base = S.supabaseUrl.replace(/\/$/, '');
-    return fetch(base + '/rest/v1/cars?select=*&visible=eq.true&order=sort.asc,id.asc', { headers: { apikey: S.supabaseKey, Authorization: 'Bearer ' + S.supabaseKey }, cache: 'no-cache' })
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    var key = String(S.supabaseKey).trim(), h = { apikey: key };
+    if (key.indexOf('eyJ') === 0) h.Authorization = 'Bearer ' + key;
+    return fetch(base + '/rest/v1/cars?select=*&visible=eq.true&order=sort.asc,id.asc', { headers: h, cache: 'no-store' })
+      .then(function (r) { if (!r.ok) { return r.text().then(function (t) { throw new Error(r.status + ' ' + t); }); } return r.json(); })
       .then(function (rows) {
         return rows.map(function (r) {
           return { type: r.type === 'rent' ? 'rent' : 'sale', name: r.name || '', year: r.year || '', km: r.km ? String(r.km) : '', price: r.price || '', note: r.note || '', status: ['sold', 'reserved'].indexOf(r.status) > -1 ? r.status : 'available', image: imgUrl(r.image) };
         });
       });
   }
-  var first = (S.supabaseUrl && S.supabaseKey) ? loadSupabase().catch(function () { return load('cars.csv'); }) : S.sheetCsvUrl ? load(S.sheetCsvUrl).catch(function () { return load('cars.csv'); }) : load('cars.csv');
+  var first = (S.supabaseUrl && S.supabaseKey) ? loadSupabase().catch(function (e) { window.__sbError = String(e && e.message || e); if (window.console) console.error('Supabase:', window.__sbError); return load('cars.csv'); }) : S.sheetCsvUrl ? load(S.sheetCsvUrl).catch(function () { return load('cars.csv'); }) : load('cars.csv');
   first.then(render).catch(function () { empty.textContent = 'تعذّر تحميل السيارات. حدّث الصفحة.'; empty.hidden = false; });
 })();
