@@ -1,0 +1,109 @@
+(function () {
+  var S = window.SITE, $ = function (id) { return document.getElementById(id); };
+  var wa = (S.whatsapp || '').trim();
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // ----- بيانات الصفحة -----
+  document.title = S.brand;
+  $('plate').textContent = S.plate; $('brand').textContent = S.brand;
+  $('eyebrow').textContent = S.eyebrow; $('title').textContent = S.title; $('text').textContent = S.text;
+  $('f-brand').textContent = S.brand; $('f-brand2').textContent = S.brand; $('f-text').textContent = S.footer;
+  $('f-addr').textContent = S.address || ''; $('yr').textContent = new Date().getFullYear();
+  if (S.phone) { $('call').href = 'tel:' + S.phone; $('f-phone').href = 'tel:' + S.phone; $('f-phone').textContent = S.phone; } else { $('call').hidden = true; }
+  if (wa) {
+    $('wa-top').href = 'https://wa.me/' + wa; $('wa-float').href = 'https://wa.me/' + wa;
+    $('wa-hero').href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent('السلام عليكم، عايز أستفسر عن السيارات المتاحة');
+  } else { $('wa-top').hidden = $('wa-hero').hidden = $('wa-float').hidden = true; }
+
+  // ----- CSV -----
+  function parseCSV(t) {
+    var rows = [], row = [], f = '', q = false, i, c;
+    t = t.replace(/^﻿/, '');
+    for (i = 0; i < t.length; i++) {
+      c = t[i];
+      if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"') q = true;
+      else if (c === ',') { row.push(f); f = ''; }
+      else if (c === '\n') { row.push(f); rows.push(row); row = []; f = ''; }
+      else if (c !== '\r') f += c;
+    }
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  }
+  var T = { sale: ['بيع', 'للبيع', 'sale'], rent: ['إيجار', 'ايجار', 'للإيجار', 'للايجار', 'rent'] };
+  function typeOf(v) { v = (v || '').trim().toLowerCase(); return T.rent.indexOf(v) > -1 ? 'rent' : 'sale'; }
+  function statusOf(v) { v = (v || '').trim().toLowerCase(); if (['تم البيع', 'تم الايجار', 'تم الإيجار', 'sold'].indexOf(v) > -1) return 'sold'; if (['محجوزة', 'محجوز', 'reserved'].indexOf(v) > -1) return 'reserved'; return 'available'; }
+  function imgUrl(v) {
+    v = (v || '').trim(); if (!v) return '';
+    var m = v.match(/drive\.google\.com\/file\/d\/([\w-]+)/) || v.match(/drive\.google\.com\/.*[?&]id=([\w-]+)/);
+    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w900';
+    return v;
+  }
+  function toCars(rows) {
+    var out = [];
+    for (var i = 1; i < rows.length; i++) {
+      var r = rows[i]; if (!r || !(r[2] || '').trim()) continue;
+      var show = (r[0] || '').trim().toLowerCase();
+      if (['لا', 'no', 'n', 'مخفي', 'hide'].indexOf(show) > -1) continue;
+      out.push({ type: typeOf(r[1]), name: r[2].trim(), year: (r[3] || '').trim(), km: (r[4] || '').replace(/[^\d]/g, ''), price: (r[5] || '').trim(), note: (r[6] || '').trim(), status: statusOf(r[7]), image: imgUrl(r[8]) });
+    }
+    return out;
+  }
+
+  // ----- عرض الكروت -----
+  function odo(km) {
+    if (!km) return '';
+    var p = ('000000' + km).slice(-6), seen = false, h = '';
+    for (var i = 0; i < 6; i++) { var ch = p[i]; if (ch !== '0') seen = true; h += '<i class="' + (seen ? '' : 'dim') + '">' + ch + '</i>'; }
+    return '<div class="odo" dir="ltr" aria-label="' + esc(km) + ' كم">' + h + '<small>كم</small></div>';
+  }
+  function card(c) {
+    var msg = 'السلام عليكم، مهتم بـ ' + c.name + (c.type === 'rent' ? ' (إيجار)' : ' (بيع)');
+    var photo = c.image ? '<img src="' + esc(c.image) + '" alt="' + esc(c.name) + '" loading="lazy" width="900" height="600" referrerpolicy="no-referrer">' : '<div class="ph" aria-hidden="true">🚗</div>';
+    var sold = c.status === 'sold' ? '<span class="ribbon">' + (c.type === 'rent' ? 'مؤجرة' : 'تم البيع') + '</span>' : c.status === 'reserved' ? '<span class="ribbon amber">محجوزة</span>' : '';
+    return '<article class="card status-' + c.status + '" data-type="' + c.type + '" data-name="' + esc((c.name + ' ' + c.year).toLowerCase()) + '">' +
+      '<div class="photo">' + photo + '<span class="tag ' + c.type + '">' + (c.type === 'rent' ? 'للإيجار' : 'للبيع') + '</span>' + sold + '</div>' +
+      '<div class="body"><h3>' + esc(c.name) + '</h3><div class="meta">' +
+      (c.year ? '<span>موديل ' + esc(c.year) + '</span>' : '') + (c.price ? '<span class="price">' + esc(c.price) + '</span>' : '') + '</div>' +
+      odo(c.km) + (c.note ? '<p class="note">' + esc(c.note) + '</p>' : '') +
+      (wa && c.status !== 'sold' ? '<a class="btn wa block" target="_blank" rel="noopener" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(msg) + '">اسأل عنها واتساب</a>' : '') +
+      '</div></article>';
+  }
+
+  // ----- فلترة وبحث -----
+  var grid = $('car-grid'), filter = 'all', input = $('car-search'), empty = $('car-empty'), cards = [];
+  function apply() {
+    var q = (input.value || '').trim().toLowerCase(), shown = 0;
+    cards.forEach(function (x) {
+      var ok = (filter === 'all' || x.dataset.type === filter) && (!q || x.dataset.name.indexOf(q) > -1);
+      x.hidden = !ok; if (ok) shown++;
+    });
+    empty.hidden = shown > 0;
+  }
+  function render(cars) {
+    grid.innerHTML = cars.map(card).join('');
+    cards = [].slice.call(grid.querySelectorAll('.card'));
+    var c = { all: cars.length, sale: 0, rent: 0 };
+    cars.forEach(function (x) { c[x.type]++; });
+    document.querySelectorAll('[data-count]').forEach(function (b) { b.textContent = c[b.dataset.count] || 0; });
+    apply();
+  }
+  var chips = [].slice.call(document.querySelectorAll('.chip'));
+  chips.forEach(function (ch) { ch.addEventListener('click', function () { filter = ch.dataset.filter; chips.forEach(function (c) { c.classList.toggle('is-on', c === ch); }); apply(); }); });
+  input.addEventListener('input', apply);
+
+  // ----- تحميل -----
+  function load(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) { return toCars(parseCSV(t)); }); }
+  function loadSupabase() {
+    var base = S.supabaseUrl.replace(/\/$/, '');
+    return fetch(base + '/rest/v1/cars?select=*&visible=eq.true&order=sort.asc,id.asc', { headers: { apikey: S.supabaseKey, Authorization: 'Bearer ' + S.supabaseKey }, cache: 'no-cache' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (rows) {
+        return rows.map(function (r) {
+          return { type: r.type === 'rent' ? 'rent' : 'sale', name: r.name || '', year: r.year || '', km: r.km ? String(r.km) : '', price: r.price || '', note: r.note || '', status: ['sold', 'reserved'].indexOf(r.status) > -1 ? r.status : 'available', image: imgUrl(r.image) };
+        });
+      });
+  }
+  var first = (S.supabaseUrl && S.supabaseKey) ? loadSupabase().catch(function () { return load('cars.csv'); }) : S.sheetCsvUrl ? load(S.sheetCsvUrl).catch(function () { return load('cars.csv'); }) : load('cars.csv');
+  first.then(render).catch(function () { empty.textContent = 'تعذّر تحميل السيارات. حدّث الصفحة.'; empty.hidden = false; });
+})();

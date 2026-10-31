@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1d4a97">
+<title>الهاشمي للسيارات</title>
+<meta name="description" content="بيع وإيجار سيارات بأفضل الأسعار.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<header class="site-header"><div class="wrap bar">
+  <a class="brand" href="./"><span class="plate" aria-hidden="true" id="plate"></span><span class="brand-name" id="brand"></span></a>
+  <div class="bar-actions"><a class="btn ghost" id="call">اتصل بنا</a><a class="btn wa" id="wa-top" target="_blank" rel="noopener">واتساب</a></div>
+</div></header>
+
+<main id="main"><section class="showroom">
+  <div class="hero"><div class="wrap">
+    <span class="eyebrow" id="eyebrow"></span><h1 id="title"></h1><p id="text"></p>
+    <a class="btn wa lg" id="wa-hero" target="_blank" rel="noopener">تواصل واتساب الآن</a>
+  </div></div>
+  <div class="wrap">
+    <div class="tools" role="search">
+      <div class="chips" role="tablist" aria-label="تصفية">
+        <button class="chip is-on" data-filter="all" type="button">الكل <b data-count="all"></b></button>
+        <button class="chip" data-filter="sale" type="button">للبيع <b data-count="sale"></b></button>
+        <button class="chip" data-filter="rent" type="button">للإيجار <b data-count="rent"></b></button>
+      </div>
+      <input class="search" type="search" id="car-search" placeholder="ابحث باسم السيارة أو الموديل…" aria-label="بحث">
+    </div>
+    <div class="grid" id="car-grid"></div>
+    <p class="empty" id="car-empty" hidden>مفيش سيارات مطابقة دلوقتي.</p>
+  </div>
+</section></main>
+
+<footer class="site-footer">
+  <div class="wrap foot">
+    <div><strong id="f-brand"></strong><p id="f-text"></p></div>
+    <div class="foot-contact"><a id="f-phone" dir="ltr"></a><span id="f-addr"></span></div>
+  </div>
+  <div class="wrap copy">© <span id="yr"></span> <span id="f-brand2"></span></div>
+</footer>
+
+<a class="wa-float" id="wa-float" target="_blank" rel="noopener" aria-label="واتساب">
+  <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.1-1.3A10 10 0 1 0 12 2zm5.2 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.2-.7-2.700-1.100-4.400-3.800-4.500-4-.1-.2-1.100-1.400-1.100-2.700s.7-1.900.9-2.200c.2-.2.500-.3.700-.3h.5c.2 0 .4 0 .6.500l.8 2c.1.2.1.3 0 .5l-.3.400-.4.400c-.1.100-.3.300-.1.600.2.300.7 1.2 1.500 1.900 1 .9 1.900 1.2 2.200 1.3.3.100.4.100.6-.1l.8-1c.2-.3.400-.2.600-.1l1.900.9c.3.100.5.200.5.300.1.2.1.8-.1 1.400z"/></svg>
+</a>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
