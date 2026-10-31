@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>إدارة السيارات</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;background:#f3f5f9;color:#14213d}
+.wrap{max-width:640px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:6px 0 14px}
+h2{font-size:17px;margin:0 0 10px}
+.box{background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}
+input,select,textarea{width:100%;padding:11px;border:1px solid #cfd6e4;border-radius:10px;font:inherit;background:#fff}
+textarea{min-height:70px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:12px 14px;cursor:pointer;background:#1d4a97;color:#fff}
+button.full{width:100%;margin-top:14px}
+button.sm{padding:8px 10px;font-size:13px}
+button.red{background:#c62828}
+button.gray{background:#6b7585}
+button:disabled{opacity:.5}
+#msg{position:sticky;top:0;z-index:9;padding:10px 12px;border-radius:10px;margin-bottom:10px;font-weight:600;display:none}
+#msg.ok{display:block;background:#d8f3dc;color:#1b4332}
+#msg.err{display:block;background:#ffd6d6;color:#7a0000}
+.previews{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.previews img{width:70px;height:70px;object-fit:cover;border-radius:8px}
+.car{display:flex;gap:10px;align-items:flex-start;border-top:1px solid #e6eaf2;padding:12px 0}
+.car:first-child{border-top:0}
+.car img{width:84px;height:64px;object-fit:cover;border-radius:8px;background:#e6eaf2;flex:none}
+.car .info{flex:1;min-width:0}
+.car .info b{display:block}
+.car .info small{color:#5b667a}
+.car .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.car select{width:auto;padding:7px;font-size:13px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="msg"></div>
+
+  <!-- تسجيل الدخول -->
+  <div id="login" class="box">
+    <h1>دخول الإدارة</h1>
+    <label>الإيميل</label><input id="email" type="email" autocomplete="username" dir="ltr">
+    <label>كلمة السر</label><input id="pass" type="password" autocomplete="current-password" dir="ltr">
+    <button class="full" id="btn-login">دخول</button>
+  </div>
+
+  <!-- لوحة الإدارة -->
+  <div id="app" class="hide">
+    <div class="top"><h1>إدارة السيارات</h1><button class="sm gray" id="btn-out">خروج</button></div>
+
+    <div class="box">
+      <h2>إضافة سيارة</h2>
+      <label>النوع</label>
+      <select id="f-type"><option value="sale">للبيع</option><option value="rent">للإيجار</option></select>
+      <label>اسم السيارة</label><input id="f-name" placeholder="Volkswagen Tiguan">
+      <div class="row">
+        <div><label>الموديل (السنة)</label><input id="f-year" inputmode="numeric" placeholder="2026"></div>
+        <div><label>العداد (كم)</label><input id="f-km" inputmode="numeric" placeholder="0"></div>
+      </div>
+      <label>السعر</label><input id="f-price" placeholder="1,500,000 جنيه">
+      <label>ملاحظة (اختياري)</label><textarea id="f-note"></textarea>
+      <label>الحالة</label>
+      <select id="f-status"><option value="available">متاحة</option><option value="reserved">محجوزة</option><option value="sold">تم البيع / مؤجرة</option></select>
+      <label>الصور (اختار كذا صورة مع بعض، الأولى هي الرئيسية)</label>
+      <input id="f-files" type="file" accept="image/*" multiple>
+      <div class="previews" id="previews"></div>
+      <button class="full" id="btn-save">حفظ السيارة</button>
+    </div>
+
+    <div class="box">
+      <h2>السيارات الحالية</h2>
+      <div id="list">جاري التحميل…</div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  var S = window.SITE || {}, BUCKET = 'Car';
+  var sb = supabase.createClient(S.supabaseUrl.replace(/\/$/, ''), String(S.supabaseKey).trim());
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var mt;
+  function msg(t, ok) { var m = $('msg'); m.className = ok ? 'ok' : 'err'; m.textContent = t; clearTimeout(mt); mt = setTimeout(function () { m.className = ''; m.style.display = 'none'; }, 6000); m.style.display = 'block'; window.scrollTo(0, 0); }
+
+  // ---- ضغط الصورة قبل الرفع (موبايلك بيصوّر صور كبيرة) ----
+  function compress(file) {
+    return new Promise(function (res, rej) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var max = 1600, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (b) { b ? res(b) : rej(new Error('compress')); }, 'image/jpeg', 0.85);
+      };
+      img.onerror = function () { rej(new Error('image')); };
+      img.src = url;
+    });
+  }
+  function uploadFiles(files) {
+    var stamp = Date.now(), jobs = [].slice.call(files).map(function (f, i) {
+      return compress(f).then(function (blob) {
+        var path = stamp + '-' + i + '-' + Math.random().toString(36).slice(2, 7) + '.jpg';
+        return sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg' }).then(function (r) {
+          if (r.error) throw r.error;
+          return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+        });
+      });
+    });
+    return Promise.all(jobs);
+  }
+
+  // ---- دخول / خروج ----
+  function show(user) { $('login').classList.toggle('hide', !!user); $('app').classList.toggle('hide', !user); if (user) loadList(); }
+  sb.auth.getSession().then(function (r) { show(r.data.session && r.data.session.user); });
+  $('btn-login').onclick = function () {
+    sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('pass').value }).then(function (r) {
+      if (r.error) return msg('الدخول فشل: الإيميل أو كلمة السر غلط', false);
+      show(r.data.user);
+    });
+  };
+  $('btn-out').onclick = function () { sb.auth.signOut().then(function () { show(null); }); };
+
+  // ---- معاينة الصور ----
+  $('f-files').onchange = function () {
+    var p = $('previews'); p.innerHTML = '';
+    [].slice.call(this.files).forEach(function (f) { var i = document.createElement('img'); i.src = URL.createObjectURL(f); p.appendChild(i); });
+  };
+
+  // ---- حفظ سيارة جديدة ----
+  $('btn-save').onclick = function () {
+    var name = $('f-name').value.trim();
+    if (!name) return msg('اكتب اسم السيارة', false);
+    var btn = this; btn.disabled = true; btn.textContent = 'جاري الرفع…';
+    var files = $('f-files').files;
+    (files.length ? uploadFiles(files) : Promise.resolve([])).then(function (urls) {
+      var km = parseInt(String($('f-km').value).replace(/[^\d]/g, ''), 10);
+      return sb.from('cars').insert({
+        visible: true,
+        type: $('f-type').value,
+        name: name,
+        year: $('f-year').value.trim() || null,
+        km: isNaN(km) ? null : km,
+        price: $('f-price').value.trim() || null,
+        note: $('f-note').value.trim() || null,
+        status: $('f-status').value,
+        image: urls[0] || null,
+        images: urls
+      });
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      msg('تمت إضافة السيارة ✅', true);
+      ['f-name', 'f-year', 'f-km', 'f-price', 'f-note', 'f-files'].forEach(function (id) { $(id).value = ''; });
+      $('previews').innerHTML = ''; loadList();
+    }).catch(function (e) { msg('فشل الحفظ: ' + (e.message || e), false); })
+      .then(function () { btn.disabled = false; btn.textContent = 'حفظ السيارة'; });
+  };
+
+  // ---- قائمة السيارات ----
+  var cars = {};
+  function loadList() {
+    sb.from('cars').select('*').order('id', { ascending: false }).then(function (r) {
+      if (r.error) { $('list').textContent = 'خطأ: ' + r.error.message; return; }
+      cars = {}; r.data.forEach(function (c) { cars[c.id] = c; });
+      $('list').innerHTML = r.data.length ? r.data.map(row).join('') : 'مفيش سيارات.';
+    });
+  }
+  function count(c) { var s = {}; [c.image].concat(c.images || []).forEach(function (u) { if (u) s[u] = 1; }); return Object.keys(s).length; }
+  function row(c) {
+    return '<div class="car" data-id="' + c.id + '">' +
+      (c.image ? '<img src="' + esc(c.image) + '" alt="">' : '<img alt="">') +
+      '<div class="info"><b>' + esc(c.name) + '</b><small>' + (c.type === 'rent' ? 'إيجار' : 'بيع') + ' · ' + esc(c.year || '') + ' · ' + count(c) + ' صور' + (c.visible ? '' : ' · مخفية') + '</small>' +
+      '<div class="acts">' +
+      '<select data-act="status"><option value="available"' + (c.status === 'available' ? ' selected' : '') + '>متاحة</option><option value="reserved"' + (c.status === 'reserved' ? ' selected' : '') + '>محجوزة</option><option value="sold"' + (c.status === 'sold' ? ' selected' : '') + '>تم البيع</option></select>' +
+      '<button class="sm gray" data-act="vis">' + (c.visible ? 'إخفاء' : 'إظهار') + '</button>' +
+      '<button class="sm" data-act="photos">+ صور</button>' +
+      '<button class="sm red" data-act="del">حذف</button>' +
+      '</div></div></div>';
+  }
+  $('list').addEventListener('change', function (e) {
+    var a = e.target.getAttribute('data-act'); if (a !== 'status') return;
+    var id = e.target.closest('.car').getAttribute('data-id');
+    sb.from('cars').update({ status: e.target.value }).eq('id', id).then(function (r) { r.error ? msg(r.error.message, false) : msg('تم تغيير الحالة', true); });
+  });
+  $('list').addEventListener('click', function (e) {
+    var a = e.target.getAttribute('data-act'); if (!a || a === 'status') return;
+    var id = e.target.closest('.car').getAttribute('data-id'), c = cars[id];
+    if (a === 'vis') sb.from('cars').update({ visible: !c.visible }).eq('id', id).then(function (r) { r.error ? msg(r.error.message, false) : loadList(); });
+    if (a === 'del' && confirm('تحذف "' + c.name + '" نهائيًا؟')) sb.from('cars').delete().eq('id', id).then(function (r) { r.error ? msg(r.error.message, false) : (msg('تم الحذف', true), loadList()); });
+    if (a === 'photos') {
+      var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+      inp.onchange = function () {
+        if (!inp.files.length) return; msg('جاري رفع الصور…', true);
+        uploadFiles(inp.files).then(function (urls) {
+          var all = [c.image].concat(c.images || []).concat(urls).filter(Boolean);
+          all = all.filter(function (u, i) { return all.indexOf(u) === i; });
+          return sb.from('cars').update({ image: all[0], images: all }).eq('id', id);
+        }).then(function (r) { if (r.error) throw r.error; msg('تمت إضافة الصور ✅', true); loadList(); })
+          .catch(function (er) { msg('فشل: ' + (er.message || er), false); });
+      };
+      inp.click();
+    }
+  });
+})();
+</script>
+</body>
+</html>
